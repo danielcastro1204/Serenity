@@ -1,0 +1,57 @@
+plugins {
+    id 'java'
+    id 'net.serenity-bdd.serenity-gradle-plugin' version '5.3.9'
+}
+
+group = 'com.botica.alquimista'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Todas las dependencias de Serenity usan la misma versión (guía, sección 3).
+// Cucumber y JUnit Platform se alinean con las versiones que trae Serenity 5.3.9.
+def serenityVersion = '5.3.9'
+def cucumberVersion = '7.34.2'
+def junitVersion = '6.0.3'
+
+dependencies {
+    testImplementation "net.serenity-bdd:serenity-core:${serenityVersion}"
+    testImplementation "net.serenity-bdd:serenity-cucumber:${serenityVersion}"
+    testImplementation "net.serenity-bdd:serenity-screenplay:${serenityVersion}"
+    testImplementation "net.serenity-bdd:serenity-screenplay-webdriver:${serenityVersion}"
+    testImplementation "net.serenity-bdd:serenity-ensure:${serenityVersion}"
+
+    testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
+    testImplementation platform("org.junit:junit-bom:${junitVersion}")
+    testImplementation 'org.junit.platform:junit-platform-suite'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    testImplementation 'org.assertj:assertj-core:3.27.6'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+    // Propaga -Dcucumber.filter.tags, -Denvironment, -Dwebdriver.driver, etc. a la JVM de pruebas
+    systemProperties System.getProperties()
+    systemProperty 'file.encoding', 'UTF-8'
+    // Cada ejecución vuelve a correr los escenarios contra la aplicación real (sin caché de Gradle)
+    outputs.upToDateWhen { false }
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+    }
+    // El reporte de Serenity se genera aunque fallen escenarios
+    finalizedBy 'aggregate'
+}

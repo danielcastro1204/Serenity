@@ -1,0 +1,156 @@
+# Pipeline basado en el ci.yml entregado por el profesor (Teams / Intu).
+# Se conservan sus disparadores, la caché de Gradle, la lógica de selección de tags
+# (@smoketest por defecto en push/PR, tag libre en ejecución manual) y la publicación
+# de artefactos con if: always(). Cambios para Serenity BDD:
+#   - -Dkarate.options="--tags X"  ->  -Dcucumber.filter.tags="X"
+#   - Reportes: target/karate-reports -> target/site/serenity (Serenity) y
+#     build/test-results (JUnit de Gradle)
+#   - Verificación de que se ejecutó al menos un escenario
+#   - Actualización automática de los Issues vinculados por el tag @Issue-N
+name: CI
+
+on:
+  push:
+    branches: [ 'main', 'develop' ]
+  pull_request:
+    branches: [ 'main', 'develop' ]
+  workflow_dispatch:
+    inputs:
+      testTag:
+        description: 'Expresión de tags de Cucumber (ej: @Issue-5, @TC-17, @cupones, "@HU-01 and not @defecto"). Vacío = todos los escenarios.'
+        required: false
+        default: ''
+      updateIssues:
+        description: 'Comentar el resultado en los Issues vinculados (@Issue-N) y actualizar sus etiquetas'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      JAVA_VERSION: '21'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-jdk-${{ env.JAVA_VERSION }}-${{ hashFiles('**/build.gradle','**/settings.gradle','**/gradle.lockfile','gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-jdk-${{ env.JAVA_VERSION }}-
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Show browser version
+        # ubuntu-latest trae Google Chrome; Selenium Manager descarga el chromedriver compatible
+        run: google-chrome --version
+
+      - name: Run tests (with tag support)
+        env:
+          # Opcional: secretos del repositorio. Si no existen se usan los datos de práctica de serenity.conf
+          BOTICA_USERNAME: ${{ secrets.BOTICA_USERNAME }}
+          BOTICA_PASSWORD: ${{ secrets.BOTICA_PASSWORD }}
+          INPUT_TAG: ${{ github.event.inputs.testTag }}
+        run: |
+          # Determine tag: use workflow_dispatch input when present, otherwise default to @smoketest for CI events
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="$INPUT_TAG"
+          else
+            tag='@smoketest'
+          fi
+
+          # normalize: a single tag without @ gets it prepended (expressions like "a and not b" are kept)
+          if [ -n "$tag" ] && [ "${tag#*[[:space:]]}" = "$tag" ] && [ "${tag#@}" = "$tag" ]; then
+            tag="@$tag"
+          fi
+
+          echo "Using Cucumber tag expression: '$tag'"
+          echo "### Expresión de tags: \`${tag:-todos los escenarios}\`" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$tag" ]; then
+            ./gradlew clean test --no-daemon --console=plain --stacktrace "-Dcucumber.filter.tags=$tag"
+          else
+            ./gradlew clean test --no-daemon --console=plain --stacktrace
+          fi
+
+      - name: Verify that scenarios were executed
+        if: always()
+        run: |
+          report=target/cucumber-reports/cucumber.json
+          if [ ! -s "$report" ]; then
+            echo "::error::No se generó $report: la suite no ejecutó escenarios"
+            exit 1
+          fi
+          executed=$(jq '[.[].elements[]? | select(.type == "scenario")
+                          | select(any(.steps[]?; .result.status != "skipped"))] | length' "$report")
+          echo "Escenarios ejecutados: $executed"
+          echo "Escenarios ejecutados: **$executed**" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$executed" -eq 0 ]; then
+            echo "::error::La expresión de tags no seleccionó ningún escenario"
+            exit 1
+          fi
+
+      - name: List target output (for debugging)
+        if: always()
+        run: |
+          echo "-- target dir listing --"
+          ls -la target || true
+          echo "-- serenity reports listing --"
+          ls target/site/serenity | head -20 || true
+          echo "-- test results listing --"
+          ls -la build/test-results/test || true
+
+      - name: Upload Serenity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: serenity-report
+          path: target/site/serenity
+          if-no-files-found: warn
+
+      - name: Upload Cucumber JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cucumber-reports
+          path: target/cucumber-reports
+          if-no-files-found: warn
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            build/test-results/test
+            build/reports/tests/test
+          if-no-files-found: warn
+
+      - name: Update linked GitHub Issues
+        # No se ejecuta en PR de forks (sin permiso de escritura) ni cuando se desactiva manualmente
+        if: >-
+          always()
+          && hashFiles('target/cucumber-reports/cucumber.json') != ''
+          && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.event_name != 'workflow_dispatch' || github.event.inputs.updateIssues == 'true')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/actualizar-issues.sh target/cucumber-reports/cucumber.json
