@@ -80,32 +80,13 @@ Los 26 criterios verificables de HU-01 están cubiertos por al menos un escenari
 4. Para ejecutar un caso desde su Issue: *Actions → CI → Run workflow* con `testTag = @Issue-N`, o localmente `./gradlew clean test -Dcucumber.filter.tags="@Issue-N"`.
 ## 4. Project Board
 
-**Estado:** no creado todavía. El token de GitHub CLI de este equipo tiene los permisos `repo`, `workflow`,
-`gist` y `read:org`, pero no `project`, y `gh project list` responde *missing required scopes [read:project]*.
-Crear un Project v2 exige ese permiso, que solo el dueño de la cuenta puede conceder en el navegador.
+Tablero: [TestCases-Serenity - HU-01 Botica del Alquimista](https://github.com/users/danielcastro1204/projects/3)
+(proyecto #3 del usuario `danielcastro1204`, vinculado al repositorio `Serenity`).
 
-Pasos (5 minutos):
-
-1. Conceder el permiso (abre el navegador para confirmar):
-
-   ```bash
-   gh auth refresh -s project
-   ```
-
-2. Crear el tablero y vincularlo al repositorio (anote el número que devuelve el primer comando):
-
-   ```bash
-   gh project create --owner danielcastro1204 --title "Serenity - HU-01 Botica del Alquimista"
-   gh project link <NUMERO> --owner danielcastro1204 --repo danielcastro1204/Serenity
-   ```
-
-3. Agregar los 32 Issues de casos de prueba:
-
-   ```bash
-   for n in $(seq 1 32); do gh project item-add <NUMERO> --owner danielcastro1204 --url https://github.com/danielcastro1204/Serenity/issues/$n; done
-   ```
-
-4. En la web del proyecto, editar el campo **Status** con las columnas *Pendiente*, *En progreso*,
-   *Automatizado* y *Verificado*. Mover a *Verificado* los Issues con `automated-passed` y dejar en
-   *Automatizado* los que tienen `automated-failed` (#13 y #31, defectos de la app).
-   Opcional: en *Workflows* del proyecto, activar "Item added to project → Status: Automatizado".
+- Contiene los 32 Issues de casos de prueba (#1 a #32).
+- El campo **Status** tiene las columnas *Pendiente*, *En progreso*, *Automatizado* y *Verificado*.
+- Regla: con `automated-passed` el Issue va a *Verificado*; con `automated-failed` o sin ejecutar, a *Automatizado*.
+- Estado tras la ejecución completa [#38335396035](https://github.com/danielcastro1204/Serenity/actions/runs/38335396035):
+  30 en *Verificado* y 2 en *Automatizado* (#13 y #31, defectos de la app).
+- Para sincronizarlo de nuevo: `bash .github/scripts/sincronizar-project.sh 3`. Requiere `gh` con el permiso
+  `project`. Se corre en local porque el `GITHUB_TOKEN` de Actions no puede escribir en proyectos de usuario.

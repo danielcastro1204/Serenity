@@ -216,9 +216,7 @@ Escenario: El cupón ELIXIR20 descuenta el 20% cuando el subtotal llega a $100.0
 
 ## 14. Project Board
 
-Ver la sección *Pendientes manuales*: el token de `gh` no tiene el permiso `project`, por lo que el tablero
-no pudo crearse desde aquí. Pasos exactos para crearlo y vincularlo en
-[docs/trazabilidad.md](docs/trazabilidad.md#4-project-board).
+[Proyecto #3](https://github.com/users/danielcastro1204/projects/3), vinculado al repositorio, con los 32 Issues. Detalle en la sección **Project Board** al final.
 
 ## 15. Resultados
 
@@ -226,7 +224,7 @@ Ver la sección **Resultados de ejecución** al final de este archivo.
 
 ## 16. Limitaciones y pendientes manuales
 
-Ver la sección final **Pendientes manuales**.
+Ver la sección final **Pendientes**.
 
 ---
 
@@ -251,14 +249,31 @@ Corridas parciales verificadas: `@TC-01` (filtro por tag: solo 1 ejecutado, el r
 El `cucumber.json` generado se validó: los 32 escenarios llevan su `@Issue-N` y el script de Issues
 detecta como fallidos solo #13 y #31.
 
-**GitHub Actions:** todavía no se ha ejecutado, porque el código aún no está en GitHub (falta el `push`).
+### GitHub Actions (resultados reales)
 
-## Pendientes manuales
+| Ejecución | Disparador | Tags | Resultado |
+|---|---|---|---|
+| [#38334905567](https://github.com/danielcastro1204/Serenity/actions/runs/38334905567) | `push` a `main` | `@smoketest` | ✅ success · 10 ejecuciones, 0 fallos · 7 Issues comentados |
+| [#38335396035](https://github.com/danielcastro1204/Serenity/actions/runs/38335396035) | `workflow_dispatch` | todos | ❌ failure (esperado) · `45 tests completed, 2 failed` (TC-13 y TC-31) · 32 Issues comentados |
 
-1. **Subir el código** a https://github.com/danielcastro1204/Serenity (el repositorio local ya tiene un commit
-   en `main` con el remoto `origin` configurado): `git push -u origin main`. El push lanza el CI
-   (`@smoketest`), que comenta en los Issues #1, #2, #4, #9, #16, #17 y #32.
-2. **Ejecución completa en Actions:** *Actions → CI → Run workflow* con `testTag` vacío. Se espera que
-   quede en rojo por TC-13 y TC-31 y que los 32 Issues reciban su comentario y su etiqueta.
-3. **Project Board:** requiere `gh auth refresh -s project`. Pasos en [docs/trazabilidad.md](docs/trazabilidad.md#4-project-board).
-4. Opcional: crear los secretos `BOTICA_USERNAME` y `BOTICA_PASSWORD` (sin ellos se usan los datos de práctica).
+Las dos ejecuciones publicaron los artefactos `serenity-report`, `cucumber-reports` y `test-results`.
+Los Issues quedaron con `automated-passed` (30) o `automated-failed` (#13 y #31).
+
+## Project Board
+
+[TestCases-Serenity - HU-01 Botica del Alquimista](https://github.com/users/danielcastro1204/projects/3)
+(proyecto #3, vinculado al repositorio). Tiene los 32 Issues y las columnas *Pendiente*, *En progreso*,
+*Automatizado* y *Verificado*: 30 están en *Verificado* y 2 en *Automatizado* (los defectos #13 y #31).
+
+Después de cada ejecución de CI, las columnas se actualizan desde las etiquetas con:
+
+```bash
+bash .github/scripts/sincronizar-project.sh 3
+```
+
+Se corre en local porque el `GITHUB_TOKEN` de Actions no puede escribir en proyectos de usuario.
+
+## Pendientes
+
+- Ensayar los ejercicios 3, 4 y 6 de la guía de sustentación (aún no se han ejecutado).
+- Opcional: crear los secretos `BOTICA_USERNAME` y `BOTICA_PASSWORD`.
